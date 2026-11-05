@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4021:4021"
+    depends_on:
+      - minio
+      - nats
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - APP_ENV=${APP_ENV:-development}
+      - JWT_SECRET=${JWT_SECRET}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_BUCKET=${AWS_BUCKET}
+      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://minio:9000}
+      - AWS_KEY_ID=${AWS_KEY_ID}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY}
+      - NATS_URL=${NATS_URL}
+      - NATS_HOST=${NATS_HOST:-nats}
+      - NATS_PORT=${NATS_PORT:-4222}
+      - APP_PORT=4021
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9001:9000"  # MinIO API
+      - "9002:9001"  # MinIO console
+    environment:
+      MINIO_ROOT_USER: ${AWS_KEY_ID:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_KEY:-change-me-please}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+  nats:
+    image: nats:alpine
+    ports:
+      - "4222:4222"  # NATS client port
+      - "8222:8222"  # NATS monitoring port
+    command: ["-js", "-m", "8222"]
+    volumes:
+      - nats_data:/data
+
+volumes:
+  minio_data:
+  nats_data:

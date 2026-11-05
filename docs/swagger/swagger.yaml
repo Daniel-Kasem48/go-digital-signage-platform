@@ -1,0 +1,28 @@
+swagger: "2.0"
+info:
+  title: Digital Signage API
+  description: Backend API for digital signage device registration, content sync, and management.
+  version: "1.0"
+basePath: /
+paths:
+  /api/websocket-test/{deviceId}/content-sync:
+    post:
+      summary: Send manual content-sync message
+      tags: [websocket-test]
+      security:
+        - BasicAuth: []
+  /api/websocket-test/{deviceId}/device-assigned:
+    post:
+      summary: Send manual device-assigned message
+      tags: [websocket-test]
+      security:
+        - BasicAuth: []
+  /api/websocket-test/{deviceId}/custom:
+    post:
+      summary: Send custom websocket test message
+      tags: [websocket-test]
+      security:
+        - BasicAuth: []
+securityDefinitions:
+  BasicAuth:
+    type: basic

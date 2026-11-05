@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+.env
+.env.*
+!.env.example
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# DB
+*.db
+
+# Go workspace file
+go.work
+
+
+
+# IDEs and Text editors
+.vscode/
+.idea/
+
+/bin/
+/data/digital-signage
+main
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+.claude/
+CLAUDE.md

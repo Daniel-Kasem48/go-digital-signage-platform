@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  color: #1a1f2a;
+  background:
+    radial-gradient(circle at 6% 2%, rgba(237, 116, 54, 0.2), transparent 24%),
+    radial-gradient(circle at 82% 1%, rgba(64, 92, 138, 0.18), transparent 26%),
+    linear-gradient(180deg, #f9f2e9 0%, #f4f6fb 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.panel-surface {
+  @apply rounded-2xl border border-slate-200/75 bg-white/90 shadow-soft backdrop-blur;
+}
+
+.pill {
+  @apply rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600;
+}

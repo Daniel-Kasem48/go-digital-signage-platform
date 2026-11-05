@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Signage Device Simulator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        .device-frame {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            border: 3px solid #333;
+            box-sizing: border-box;
+        }
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            font-size: 12px;
+            z-index: 1000;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+        .device-info {
+            flex: 1;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .btn:hover {
+            background: #1557b0;
+        }
+        .btn.danger {
+            background: #d93025;
+        }
+        .btn.danger:hover {
+            background: #b52d20;
+        }
+        .content-area {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+        }
+        .registration-screen {
+            text-align: center;
+            padding: 2rem;
+        }
+        .registration-screen h1 {
+            color: #1a73e8;
+            margin-bottom: 2rem;
+        }
+        .registration-screen input {
+            width: 300px;
+            padding: 10px;
+            margin: 10px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            background: #222;
+            color: #fff;
+            font-size: 16px;
+        }
+        .registration-screen button {
+            width: 320px;
+            padding: 12px;
+            margin: 10px;
+            border: none;
+            border-radius: 6px;
+            background: #1a73e8;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .registration-screen button:hover {
+            background: #1557b0;
+        }
+        .error {
+            color: #f28b82;
+            margin: 10px 0;
+        }
+        .success {
+            color: #81c995;
+            margin: 10px 0;
+        }
+        .template-viewer {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+        .layout-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #111;
+        }
+        .layout-zone {
+            position: absolute;
+            border: 1px dashed rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .zone-label {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.6);
+            background: rgba(0,0,0,0.8);
+            padding: 2px 6px;
+            border-radius: 3px;
+            z-index: 10;
+        }
+        .zone-content {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .hidden {
+            display: none;
+        }
+        .logs {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 150px;
+            background: rgba(0,0,0,0.95);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            overflow-y: auto;
+            border-top: 1px solid #333;
+            z-index: 999;
+        }
+    </style>
+</head>
+<body>
+    <div class="device-frame">
+        <div class="status-bar">
+            <div class="device-info">
+                <strong>Tenant:</strong> <span id="currentTenant">test_schema</span> | 
+                <strong>Device:</strong> <span id="deviceId">Not Registered</span> | 
+                <strong>Status:</strong> <span id="deviceStatus">Offline</span> |
+                <strong>Content:</strong> <span id="contentType">None</span> |
+                <strong>WS:</strong> <span id="wsStatus">Disconnected</span> |
+                <strong>IP:</strong> <span id="deviceIP">127.0.0.1</span>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="toggleLogs()">Logs</button>
+                <button class="btn" onclick="refreshContent()">Refresh</button>
+                <button class="btn danger" onclick="resetDevice()">Reset</button>
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <!-- Registration Screen -->
+            <div id="registrationScreen" class="registration-screen">
+                <h1>🖥️ Device Registration</h1>
+                <p>Enter device details to register with the digital signage system:</p>
+                
+                <input type="text" id="tenantId" placeholder="Tenant ID (e.g., test_schema)" value="test_schema">
+                <br>
+                <input type="text" id="deviceIdentifier" placeholder="Device Identifier (e.g., DEVICE-001)" value="">
+                <br>
+                <input type="text" id="deviceVersion" placeholder="Software Version (optional)" value="1.0.0">
+                <br>
+                <button onclick="registerDevice()">Register Device</button>
+                <button onclick="simulateExistingDevice()">Simulate Existing Device</button>
+                
+                <hr style="margin: 1rem 0; border-color: #333;">
+                <h3>Or Sign In with Token</h3>
+                <input type="text" id="deviceToken" placeholder="Paste JWT token here" value="">
+                <br>
+                <button onclick="signInWithToken()">Sign In with Token</button>
+                
+                <div id="registrationMessage"></div>
+                
+                <hr style="margin: 2rem 0; border-color: #333;">
+                <h3>Device Registration Process:</h3>
+                <ol style="text-align: left; max-width: 400px; margin: 0 auto;">
+                    <li>Generate device identifier</li>
+                    <li>Create authentication challenge</li>
+                    <li>Send registration request</li>
+                    <li>Receive device credentials</li>
+                    <li>Start content polling</li>
+                </ol>
+            </div>
+            
+            <!-- Content Display -->
+            <div id="layoutContainer" class="layout-container hidden"></div>
+            <iframe id="contentFrame" class="template-viewer hidden"></iframe>
+            
+            <!-- No Content Screen -->
+            <div id="noContentScreen" class="registration-screen hidden">
+                <h1>📺 Waiting for Content</h1>
+                <p>Device is registered but no content is assigned.</p>
+                <p><strong>Device ID:</strong> <span id="registeredDeviceId"></span></p>
+                <button onclick="checkForContent()">Check for Content</button>
+                <button onclick="loadSampleContent()">Load Sample Content</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="logs" class="logs hidden"></div>
+
+    <script>
+        // Device state
+        var deviceState = {
+            id: null,
+            identifier: null,
+            registered: false,
+            token: null,
+            status: 'offline',
+            tenantId: 'test_schema'
+        };
+        
+        // Playlist state
+        var playlistState = {
+            currentPlaylist: null,
+            currentItemIndex: 0,
+            items: [],
+            isPlaying: false,
+            cycleTimeout: null,
+            layout: null,
+            zonePlayers: {}
+        };
+        
+        var logsVisible = false;
+        var contentCheckInterval = null;
+        var wsConnection = null;
+        var wsReconnectAttempts = 0;
+        var wsReconnectMaxAttempts = 5;
+        var wsConnecting = false;
+        
+        // Utility functions
+        function log(message) {
+            var timestamp = new Date().toLocaleTimeString();
+            var logElement = document.getElementById('logs');
+            logElement.innerHTML += '[' + timestamp + '] ' + message + '\n';
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log('[Device] ' + message);
+        }
+        
+        function updateStatus(status) {
+            deviceState.status = status;
+            document.getElementById('deviceStatus').textContent = status;
+        }
+        
+        function updateWSStatus(status) {
+            document.getElementById('wsStatus').textContent = status;
+        }
+        
+        function updateContentType(contentType, contentName) {
+            var display = contentType || 'None';
+            if (contentName) {
+                display = contentType + ': ' + contentName;
+            }
+            document.getElementById('contentType').textContent = display;
+        }
+        
+        function showMessage(message, type) {
+            type = type || 'info';
+            var msgElement = document.getElementById('registrationMessage');
+            msgElement.className = type;
+            msgElement.textContent = message;
+        }
+        
+        // WebSocket connection functions
+        function initWebSocket() {
+            if (!deviceState.registered || !deviceState.id) {
+                log('Cannot connect WebSocket: device not registered');
+                return;
+            }
+            
+            if (!deviceState.token) {
+                log('Cannot connect WebSocket: no authentication token');
+                return;
+            }
+            
+            if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+                log('WebSocket already connected');
+                return;
+            }
+            
+            if (wsConnecting) {
+                log('WebSocket connection already in progress');
+                return;
+            }
+            
+            log('Connecting to WebSocket server...');
+            wsConnecting = true;
+            updateWSStatus('Connecting...');
+            
+            var wsUrl = 'ws://localhost:8080/ws?token=' + encodeURIComponent(deviceState.token);
+            wsConnection = new WebSocket(wsUrl);
+            
+            wsConnection.onopen = function(event) {
+                log('WebSocket connected successfully');
+                wsConnecting = false;
+                wsReconnectAttempts = 0;
+                updateWSStatus('Connected');
+                
+                // Register device with WebSocket server
+                var registerMessage = {
+                    action: 'register-device',
+                    message: {
+                        deviceId: deviceState.id,
+                        identifier: deviceState.identifier
+                    }
+                };
+                
+                wsConnection.send(JSON.stringify(registerMessage));
+                log('Sent device registration to WebSocket server');
+                
+                // Join device room for targeted messaging
+                var joinRoomMessage = {
+                    action: 'join-room',
+                    message: {
+                        room: 'device_' + deviceState.id
+                    }
+                };
+                
+                wsConnection.send(JSON.stringify(joinRoomMessage));
+                log('Joined device room: device_' + deviceState.id);
+            };
+            
+            wsConnection.onmessage = function(event) {
+                try {
+                    var message = JSON.parse(event.data);
+                    handleWebSocketMessage(message);
+                } catch (e) {
+                    log('Invalid WebSocket message: ' + event.data);
+                }
+            };
+            
+            wsConnection.onclose = function(event) {
+                log('WebSocket connection closed (Code: ' + event.code + ')');
+                wsConnection = null;
+                wsConnecting = false;
+                updateWSStatus('Disconnected');
+                
+                // Only reconnect if it was an unexpected closure (not manual disconnect)
+                if (event.code !== 1000 && wsReconnectAttempts < wsReconnectMaxAttempts && deviceState.registered) {
+                    wsReconnectAttempts++;
+                    log('Attempting WebSocket reconnection (' + wsReconnectAttempts + '/' + wsReconnectMaxAttempts + ') in 5 seconds');
+                    setTimeout(initWebSocket, 5000);
+                } else if (event.code === 1000) {
+                    log('WebSocket closed normally - no reconnection needed');
+                } else if (wsReconnectAttempts >= wsReconnectMaxAttempts) {
+                    log('Max reconnection attempts reached - giving up');
+                }
+            };
+            
+            wsConnection.onerror = function(error) {
+                log('WebSocket error: ' + error);
+                wsConnecting = false;
+                updateWSStatus('Error');
+            };
+        }
+        
+        function handleWebSocketMessage(message) {
+            log('WebSocket message received: ' + JSON.stringify(message));
+            
+            switch (message.action) {
+                case 'device-registered':
+                    log('Device registration confirmed by server');
+                    updateStatus('registered');
+                    break;
+                    
+                case 'device-assigned':
+                    log('Device assignment received');
+                    if (message.message && message.message.channelId) {
+                        log('Assigned to channel: ' + message.message.channelId);
+                        // Content will be provided via content-sync event
+                        log('Waiting for content-sync event...');
+                    }
+                    break;
+                    
+                case 'content-sync':
+                    log('Content sync message received');
+                    // Handle both direct contentData and activeChannel data
+                    if (message.data && message.data.contentData) {
+                        // Direct content data (manual WebSocket test)
+                        loadContentFromWebSocket(message.data.contentData);
+                    } else if (message.data && message.data.activeChannel) {
+                        // Channel publish data - call display API to get structured content
+                        log('Channel data received, fetching display content...');
+                        handleChannelSync(message.data.activeChannel);
+                    } else {
+                        log('Empty content-sync received - fetching current display content');
+                        // Fallback to checking display API
+                        checkForContent();
+                    }
+                    break;
+                    
+                case 'room-joined':
+                    log('Successfully joined room: ' + (message.message ? message.message.room : 'unknown'));
+                    break;
+                    
+                default:
+                    log('Unknown WebSocket action: ' + message.action);
+            }
+        }
+        
+        function loadContentFromWebSocket(contentData) {
+            log('Loading content from WebSocket data...');
+            updateStatus('displaying_content');
+            
+            if (contentData.type === 'template' && contentData.contentId) {
+                loadTemplateContent(contentData.contentId);
+            } else if (contentData.type === 'media' && contentData.url) {
+                loadMediaContent(contentData.url, contentData.type);
+            } else {
+                log('Invalid content data received - missing contentId or url');
+                log('Content data: ' + JSON.stringify(contentData));
+            }
+        }
+        
+        function handleChannelSync(activeChannelData) {
+            try {
+                log('Processing channel sync data...');
+                
+                // Parse the activeChannel JSON string if it's a string
+                var channelData;
+                if (typeof activeChannelData === 'string') {
+                    channelData = JSON.parse(activeChannelData);
+                } else {
+                    channelData = activeChannelData;
+                }
+                
+                log('Channel: ' + channelData.Name + ' (' + channelData.ID + ')');
+                
+                // Channel data received via WebSocket means content has changed
+                // Call the display API to get the structured content
+                log('Calling display API to get current content...');
+                checkForContent();
+                
+            } catch (error) {
+                log('Error processing channel sync data: ' + error.message);
+                // Fallback to display API call
+                checkForContent();
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (wsConnection) {
+                log('Disconnecting WebSocket...');
+                wsConnection.close(1000); // Normal closure
+                wsConnection = null;
+                wsConnecting = false;
+                updateWSStatus('Disconnected');
+            }
+        }
+        
+        // Generate device identifier
+        function generateDeviceId() {
+            return 'DEVICE-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+        }
+        
+        // Parse JWT token to extract device information
+        function parseJWT(token) {
+            try {
+                var base64Url = token.split('.')[1];
+                var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                var jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                log('Failed to parse JWT token: ' + e.message);
+                return null;
+            }
+        }
+        
+        // Sign in with existing JWT token
+        function signInWithToken() {
+            var token = document.getElementById('deviceToken').value.trim();
+            var tenantId = document.getElementById('tenantId').value || 'test_schema';
+            
+            if (!token) {
+                showMessage('Please enter a valid JWT token', 'error');
+                return;
+            }
+            
+            log('Attempting to sign in with provided token...');
+            showMessage('Validating token...', 'info');
+            
+            // Parse the token to extract device info
+            var tokenData = parseJWT(token);
+            if (!tokenData) {
+                showMessage('Invalid token format', 'error');
+                return;
+            }
+            
+            log('Token parsed successfully: Device ID = ' + tokenData.deviceID + ', Device Code = ' + tokenData.deviceCode);
+            
+            // Check if token is expired
+            var now = Math.floor(Date.now() / 1000);
+            if (tokenData.exp && tokenData.exp < now) {
+                showMessage('Token has expired. Please obtain a new token.', 'error');
+                log('Token expired: exp=' + tokenData.exp + ', now=' + now);
+                return;
+            }
+            
+            // Set device state from token
+            deviceState.id = tokenData.deviceID;
+            deviceState.identifier = tokenData.deviceCode;
+            deviceState.token = token;
+            deviceState.registered = true;
+            deviceState.tenantId = tenantId;
+            
+            // Update UI
+            document.getElementById('deviceId').textContent = deviceState.id;
+            document.getElementById('registeredDeviceId').textContent = deviceState.id;
+            document.getElementById('currentTenant').textContent = tenantId;
+            
+            showMessage('Token validation successful!', 'success');
+            updateStatus('registered');
+            log('Device authenticated successfully with UUID: ' + deviceState.id + ' (code: ' + deviceState.identifier + ')');
+            
+            // Switch to content waiting screen and connect WebSocket
+            setTimeout(function() {
+                switchToContentWaiting();
+                initWebSocket();
+            }, 1500);
+        }
+        
+        // Derive key using same logic as server
+        function deriveKey(knownPart) {
+            var now = new Date();
+            // Use UTC time to match server
+            var keyMaterial = now.getUTCFullYear() + '-' + (now.getUTCMonth() + 1) + '-' + now.getUTCDate();
+            return keyMaterial + knownPart;
+        }
+        
+        // Generate proper SHA256 hash for challenge
+        async function generateChallengeHash(challengeValue) {
+            var secretKey = deriveKey('secret');
+            var data = challengeValue + secretKey;
+            
+            // Use Web Crypto API for SHA256
+            var encoder = new TextEncoder();
+            var dataBuffer = encoder.encode(data);
+            var hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+            var hashArray = new Uint8Array(hashBuffer);
+            var hashHex = Array.from(hashArray)
+                .map(function(b) { return b.toString(16).padStart(2, '0'); })
+                .join('');
+            
+            return hashHex;
+        }
+        
+        function completeRegistration(identifier, deviceData) {
+            var resolvedIdentifier = identifier;
+            if (deviceData && deviceData.device && deviceData.device.code) {
+                resolvedIdentifier = deviceData.device.code;
+            }
+
+            deviceState.id = (deviceData && deviceData.device && deviceData.device.id) || identifier;
+            deviceState.identifier = resolvedIdentifier;
+            deviceState.token = deviceData ? deviceData.token : null;
+            deviceState.registered = true;
+
+            document.getElementById('deviceId').textContent = deviceState.id;
+            document.getElementById('registeredDeviceId').textContent = deviceState.id;
+
+            showMessage('Registration successful!', 'success');
+            updateStatus('registered');
+            log('Device registered successfully with UUID: ' + deviceState.id + ' (code: ' + deviceState.identifier + ')');
+
+            setTimeout(function() {
+                switchToContentWaiting();
+                initWebSocket();
+            }, 1200);
+        }
+
+        function registerDeviceLegacy(identifier, version) {
+            log('Falling back to legacy challenge registration flow');
+            log('Requesting authentication challenge...');
+
+            return fetch('http://localhost:8080/public/devices/auth-challenge', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': deviceState.tenantId
+                },
+                body: JSON.stringify({ identifier: identifier })
+            })
+            .then(function(response) {
+                return response.text().then(function(text) {
+                    return { status: response.status, text: text, ok: response.ok };
+                });
+            })
+            .then(function(challengeResult) {
+                if (!challengeResult.ok) {
+                    throw new Error('Challenge request failed: ' + challengeResult.text);
+                }
+                var challengeData = JSON.parse(challengeResult.text);
+                return generateChallengeHash(challengeData.value);
+            })
+            .then(function(challengeHash) {
+                var registrationData = {
+                    identifier: identifier,
+                    challengeHash: challengeHash,
+                    version: version,
+                    ipAddress: '127.0.0.1'
+                };
+                return fetch('http://localhost:8080/public/devices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Tenant-ID': deviceState.tenantId
+                    },
+                    body: JSON.stringify(registrationData)
+                });
+            })
+            .then(function(response) {
+                return response.text().then(function(text) {
+                    return { status: response.status, text: text, ok: response.ok };
+                });
+            })
+            .then(function(result) {
+                if (!result.ok) {
+                    throw new Error('Legacy registration failed: ' + result.text);
+                }
+                return JSON.parse(result.text);
+            });
+        }
+
+        // Register device with the system
+        function registerDevice() {
+            var tenantId = document.getElementById('tenantId').value || 'test_schema';
+            var identifier = document.getElementById('deviceIdentifier').value || generateDeviceId();
+            var version = document.getElementById('deviceVersion').value || '1.0.0';
+
+            deviceState.tenantId = tenantId;
+            document.getElementById('currentTenant').textContent = tenantId;
+
+            log('Starting registration process for ' + identifier + ' in tenant: ' + tenantId);
+            showMessage('Registering device...', 'info');
+            updateStatus('registering');
+
+            var simplePayload = {
+                identifier: identifier,
+                name: identifier,
+                version: version,
+                ipAddress: '127.0.0.1'
+            };
+
+            fetch('http://localhost:8080/public/devices/register-simple', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': deviceState.tenantId
+                },
+                body: JSON.stringify(simplePayload)
+            })
+            .then(function(response) {
+                return response.text().then(function(text) {
+                    return { status: response.status, text: text, ok: response.ok };
+                });
+            })
+            .then(function(simpleResult) {
+                if (simpleResult.ok) {
+                    log('Simple registration response (' + simpleResult.status + ')');
+                    return JSON.parse(simpleResult.text);
+                }
+                log('Simple registration unavailable (' + simpleResult.status + '), trying legacy flow');
+                return registerDeviceLegacy(identifier, version);
+            })
+            .then(function(deviceData) {
+                completeRegistration(identifier, deviceData);
+            })
+            .catch(function(error) {
+                log('Registration error: ' + error.message);
+                showMessage('Registration failed: ' + error.message, 'error');
+                updateStatus('registration_failed');
+            });
+        }
+        
+        // Simulate an already existing device for testing
+        function simulateExistingDevice() {
+            var tenantId = document.getElementById('tenantId').value || 'test_schema';
+            var deviceId = 'SIM-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+            
+            deviceState.id = deviceId;
+            deviceState.identifier = deviceId;
+            deviceState.registered = true;
+            deviceState.tenantId = tenantId;
+            
+            document.getElementById('deviceId').textContent = deviceId;
+            document.getElementById('registeredDeviceId').textContent = deviceId;
+            document.getElementById('currentTenant').textContent = tenantId;
+            
+            log('Simulating existing device: ' + deviceId);
+            updateStatus('registered');
+            
+            switchToContentWaiting();
+            initWebSocket();
+        }
+        
+        // Switch to content waiting screen
+        function switchToContentWaiting() {
+            document.getElementById('registrationScreen').classList.add('hidden');
+            document.getElementById('noContentScreen').classList.remove('hidden');
+            
+            // Start checking for content
+            startContentPolling();
+        }
+        
+        // Start polling for content
+        function startContentPolling() {
+            log('Content polling disabled - using WebSocket sync events');
+            updateStatus('waiting_for_websocket_sync');
+            
+            // DISABLED: Auto-polling replaced with WebSocket sync
+            // contentCheckInterval = setInterval(checkForContent, 10000); // Check every 10 seconds
+            // checkForContent(); // Check immediately
+        }
+        
+        // Check for content assigned to this device
+        function checkForContent() {
+            if (!deviceState.registered) return;
+            
+            log('Checking for content for device ' + deviceState.id);
+            
+            // Try to get device display data
+            fetch('http://localhost:8080/api/devices/' + deviceState.id + '/display', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa('backend_user:backend_password'),
+                    'X-Tenant-ID': deviceState.tenantId
+                }
+            })
+            .then(function(response) {
+                return response.text().then(function(text) {
+                    return { status: response.status, text: text, ok: response.ok };
+                });
+            })
+            .then(function(result) {
+                if (result.ok) {
+                    var displayData;
+                    try {
+                        displayData = JSON.parse(result.text);
+                        log('Received display data: ' + JSON.stringify(displayData));
+                        
+                        if (Object.keys(displayData).length > 0) {
+                            loadPlaylistContent(displayData);
+                        } else {
+                            log('No content assigned to device');
+                            updateStatus('waiting_for_content');
+                        }
+                    } catch (e) {
+                        log('Invalid JSON response: ' + result.text);
+                        updateStatus('waiting_for_content');
+                    }
+                } else {
+                    log('Display data request failed: ' + result.status + ' - ' + result.text);
+                    updateStatus('content_error');
+                }
+            })
+            .catch(function(error) {
+                log('Content check error: ' + error.message);
+                updateStatus('content_error');
+            });
+        }
+        
+        // Load sample content for testing
+        function loadSampleContent() {
+            log('Sample content button clicked - this feature requires actual content from server');
+            
+            // Update the message to indicate sample content is not available
+            var messageElement = document.getElementById('noContentScreen').querySelector('p');
+            if (messageElement) {
+                messageElement.textContent = 'Sample content loading requires actual content to be assigned to this device via the management interface.';
+            }
+            
+            updateStatus('waiting_for_content');
+        }
+        
+        // Load playlist-based content structure with full cycling support
+        function loadPlaylistContent(displayData) {
+            log('Processing playlist content structure...');
+            
+            // Get the first channel (assuming single active channel)
+            var channelId = Object.keys(displayData)[0];
+            var channel = displayData[channelId];
+            
+            log('Processing channel: ' + channel.Name + ' (' + channelId + ')');
+            
+            if (!channel.Schedules || channel.Schedules.length === 0) {
+                log('No schedules found in channel');
+                updateStatus('waiting_for_content');
+                return;
+            }
+            
+            // Get the first schedule (for now, we'll use the first available)
+            var schedule = channel.Schedules[0];
+            var playlist = schedule.Playlist;
+            
+            log('Processing playlist: ' + playlist.Name + ' with ' + playlist.Items.length + ' items');
+            
+            if (!playlist.Items || playlist.Items.length === 0) {
+                log('No items found in playlist');
+                updateStatus('waiting_for_content');
+                return;
+            }
+            
+            // Filter only active items and sort by order
+            var activeItems = playlist.Items.filter(function(item) { 
+                return item.IsActive; 
+            }).sort(function(a, b) { 
+                return a.Order - b.Order; 
+            });
+            
+            if (activeItems.length === 0) {
+                log('No active items found in playlist');
+                updateStatus('waiting_for_content');
+                return;
+            }
+            
+            log('Found ' + activeItems.length + ' active playlist items');
+            
+            // Initialize playlist state
+            playlistState.currentPlaylist = playlist;
+            playlistState.items = activeItems;
+            playlistState.currentItemIndex = 0;
+            playlistState.isPlaying = true;
+            playlistState.layout = playlist.Layout;
+            clearZonePlayers();
+            
+            log('Playlist has layout: ' + (playlist.Layout ? playlist.Layout.Name : 'None'));
+            if (playlist.Layout && playlist.Layout.Zones) {
+                log('Layout zones: ' + JSON.stringify(playlist.Layout.Zones));
+            }
+            
+            // Prefer explicit zone lanes if provided by backend.
+            if (playlist.ZonePlayback && playlist.ZonePlayback.length > 0) {
+                log('Using zone-parallel playback lanes from backend payload');
+                if (startZoneParallelPlayback(playlist.ZonePlayback)) {
+                    return;
+                }
+            }
+
+            // Fallback to legacy global cycling.
+            startPlaylistCycle();
+        }
+        
+        // Start cycling through playlist items
+        function startPlaylistCycle() {
+            if (!playlistState.isPlaying || playlistState.items.length === 0) {
+                log('Cannot start playlist cycle - no items or not playing');
+                return;
+            }
+            
+            var currentItem = playlistState.items[playlistState.currentItemIndex];
+            log('Playing playlist item ' + (playlistState.currentItemIndex + 1) + '/' + playlistState.items.length + 
+                ': ' + currentItem.ContentID);
+            
+            // Calculate duration from timestring (e.g., "00:00:30" = 30 seconds)
+            var duration = parseTimeString(currentItem.TimeString);
+            log('Item duration: ' + duration + 'ms');
+            
+            // Load the content based on its type
+            loadContentByType(currentItem.ContentID, duration);
+            
+            // If there are multiple items, set up cycling
+            if (playlistState.items.length > 1) {
+                playlistState.cycleTimeout = setTimeout(function() {
+                    moveToNextPlaylistItem();
+                }, duration);
+            }
+        }
+        
+        // Move to the next playlist item
+        function moveToNextPlaylistItem() {
+            if (!playlistState.isPlaying) return;
+            
+            playlistState.currentItemIndex = (playlistState.currentItemIndex + 1) % playlistState.items.length;
+            log('Moving to next playlist item: ' + playlistState.currentItemIndex);
+            
+            // Clear any existing timeout
+            if (playlistState.cycleTimeout) {
+                clearTimeout(playlistState.cycleTimeout);
+                playlistState.cycleTimeout = null;
+            }
+            
+            // Start the next item
+            startPlaylistCycle();
+        }
+        
+        // Parse timestring to milliseconds (e.g., "00:00:30" -> 30000, "00:00-23:59" -> all day)
+        function parseTimeString(timeString) {
+            if (!timeString) return 10000; // Default 10 seconds
+            
+            // Handle all-day format (e.g., "00:00-23:59")
+            if (timeString.includes('-')) {
+                log('All-day content detected, using 60 second display');
+                return 60000; // Show all-day content for 60 seconds in simulator
+            }
+            
+            // Handle duration format (e.g., "00:00:30" = 30 seconds)
+            var parts = timeString.split(':');
+            if (parts.length >= 3) {
+                var hours = parseInt(parts[0]) || 0;
+                var minutes = parseInt(parts[1]) || 0;
+                var seconds = parseInt(parts[2]) || 0;
+                return (hours * 3600 + minutes * 60 + seconds) * 1000;
+            }
+            
+            return 10000; // Default 10 seconds
+        }
+
+        function clearZonePlayers() {
+            Object.keys(playlistState.zonePlayers || {}).forEach(function(zoneKey) {
+                var state = playlistState.zonePlayers[zoneKey];
+                if (state && state.timeout) {
+                    clearTimeout(state.timeout);
+                }
+            });
+            playlistState.zonePlayers = {};
+        }
+
+        function renderZoneItemByContentId(contentId, zoneIndex, duration) {
+            fetch('http://localhost:8080/api/contents', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('backend_user:backend_password'),
+                    'X-Tenant-ID': deviceState.tenantId
+                }
+            })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch content list');
+                }
+                return response.json();
+            })
+            .then(function(data) {
+                if (!data || !data.data) {
+                    throw new Error('No content data');
+                }
+
+                var content = data.data.find(function(item) { return item.id === contentId; });
+                if (!content) {
+                    throw new Error('Content not found: ' + contentId);
+                }
+
+                if (content.content_type === 'template') {
+                    loadContentIntoZone(content.id, zoneIndex, duration);
+                    return;
+                }
+
+                if (content.content_type === 'image' || content.content_type === 'video') {
+                    var mediaUrl = content.full_url || (content.file_path ? 'http://localhost:8080/cloud/files/' + content.file_path : '');
+                    if (!mediaUrl) {
+                        throw new Error('No media URL for content: ' + content.id);
+                    }
+                    loadMediaIntoZone(mediaUrl, content.content_type, content.name || content.id, zoneIndex, duration);
+                    return;
+                }
+
+                loadContentIntoZone(content.id, zoneIndex, duration);
+            })
+            .catch(function(error) {
+                log('Zone render failed for content ' + contentId + ': ' + error.message);
+            });
+        }
+
+        function startZoneParallelPlayback(zoneLanes) {
+            if (!Array.isArray(zoneLanes) || zoneLanes.length === 0) {
+                return false;
+            }
+
+            setupLayoutZones();
+            clearZonePlayers();
+            playlistState.isPlaying = true;
+
+            zoneLanes.forEach(function(lane) {
+                var laneItems = (lane.Items || []).filter(function(item) { return item.IsActive !== false; });
+                if (laneItems.length === 0) return;
+
+                var zoneIndex = lane.LayoutPosition || 1;
+                var zoneKey = String(zoneIndex);
+
+                playlistState.zonePlayers[zoneKey] = { index: 0, timeout: null, items: laneItems };
+
+                function playLaneItem(index) {
+                    if (!playlistState.isPlaying) return;
+                    var item = laneItems[index % laneItems.length];
+                    var duration = parseTimeString(item.TimeString);
+
+                    renderZoneItemByContentId(item.ContentID, zoneIndex, duration);
+
+                    playlistState.zonePlayers[zoneKey].index = (index + 1) % laneItems.length;
+                    playlistState.zonePlayers[zoneKey].timeout = setTimeout(function() {
+                        playLaneItem(playlistState.zonePlayers[zoneKey].index);
+                    }, duration);
+                }
+
+                playLaneItem(0);
+            });
+
+            log('Started parallel zone playback with ' + zoneLanes.length + ' lanes');
+            return true;
+        }
+        
+        // Legacy content loading (now handled by playlist cycling)
+        function fetchContentData(contentId) {
+            log('Legacy fetchContentData called for: ' + contentId);
+            // This is now handled by the new playlist cycling system
+            loadTemplateContent(contentId);
+        }
+        
+        // Fetch content config and inject into iframe
+        function fetchAndInjectConfig(contentId, frame) {
+            try {
+                // Use the backend API to get content data
+                var apiUrl = 'http://localhost:8080/api/contents';
+                log('Fetching content list to find: ' + contentId);
+                
+                fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa('backend_user:backend_password')
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        log('Content API fetch failed: ' + response.status + ' ' + response.statusText);
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.data) {
+                        // Find the content by ID
+                        var content = data.data.find(function(item) {
+                            return item.id === contentId;
+                        });
+                        
+                        if (content && content.schema) {
+                            // Decode the base64 schema
+                            var schemaStr = atob(content.schema);
+                            var schemaObj = JSON.parse(schemaStr);
+                            
+                            // Extract default values from schema properties
+                            var config = {};
+                            if (schemaObj.schema && schemaObj.schema.properties) {
+                                for (var key in schemaObj.schema.properties) {
+                                    var prop = schemaObj.schema.properties[key];
+                                    if (prop.default !== undefined) {
+                                        config[key] = prop.default;
+                                    }
+                                }
+                            }
+                            
+                            log('Injecting config into template: ' + JSON.stringify(config));
+                            frame.contentWindow.postMessage({
+                                type: 'updateConfig',
+                                config: config
+                            }, '*');
+                        } else {
+                            log('Content not found or has no schema: ' + contentId);
+                        }
+                    } else {
+                        log('No content data received');
+                    }
+                })
+                .catch(error => {
+                    log('Error fetching content: ' + error.message);
+                });
+            } catch (error) {
+                log('Exception in fetchAndInjectConfig: ' + error.message);
+            }
+        }
+        
+        // Load fallback content when content fetch fails
+        function loadFallbackContent() {
+            log('Content fetch failed - showing fallback message');
+            
+            // Simply show the no content screen instead of trying to load a template
+            document.getElementById('noContentScreen').classList.remove('hidden');
+            document.getElementById('contentFrame').classList.add('hidden');
+            
+            var messageElement = document.getElementById('noContentScreen').querySelector('p');
+            if (messageElement) {
+                messageElement.textContent = 'Failed to load content. Please check server connection.';
+            }
+            
+            updateStatus('content_load_failed');
+        }
+
+        // Load content into the display (legacy - now handled by playlist)
+        function loadContent(displayData) {
+            log('Loading assigned content...');
+            log('Display data received: ' + JSON.stringify(displayData));
+            
+            if (!displayData || !displayData.contentId) {
+                log('No valid display data or contentId provided');
+                updateStatus('invalid_content_data');
+                return;
+            }
+            
+            updateStatus('displaying_content');
+            loadTemplateContent(displayData.contentId);
+        }
+        
+        // Load image content
+        function loadImageContent(content, duration) {
+            log('Loading image content: ' + content.name);
+            
+            // Use full_url if available, otherwise construct from file_path
+            var imageUrl;
+            if (content.full_url) {
+                imageUrl = content.full_url;
+                log('Using full URL: ' + imageUrl);
+            } else if (content.file_path) {
+                // Fallback to constructing URL from file_path
+                imageUrl = 'http://localhost:8080/cloud/files/' + content.file_path;
+                log('Constructed URL from file_path: ' + imageUrl);
+            } else {
+                log('No URL or file path found for image content');
+                loadFallbackContent();
+                return;
+            }
+            
+            // Hide waiting screen
+            document.getElementById('noContentScreen').classList.add('hidden');
+            
+            // Check if we're using layout zones for images
+            if (playlistState.layout && playlistState.layout.Zones && playlistState.currentItemIndex !== undefined) {
+                var currentItem = playlistState.items[playlistState.currentItemIndex];
+                if (currentItem && currentItem.LayoutPosition) {
+                    setupLayoutZones();
+                    loadMediaIntoZone(imageUrl, 'image', content.name, currentItem.LayoutPosition, duration);
+                    return;
+                }
+            }
+            
+            // No layout zones, use fullscreen
+            document.getElementById('layoutContainer').classList.add('hidden');
+            document.getElementById('contentFrame').classList.remove('hidden');
+            
+            var html = generateMediaHTML(imageUrl, 'image', content.name, duration);
+            loadHTMLContent(html);
+            
+            updateStatus('displaying_image');
+            updateContentType('Image', content.name);
+        }
+
+        // Load video content
+        function loadVideoContent(content, duration) {
+            log('Loading video content: ' + content.name);
+            
+            // Use full_url if available, otherwise construct from file_path
+            var videoUrl;
+            if (content.full_url) {
+                videoUrl = content.full_url;
+                log('Using full URL: ' + videoUrl);
+            } else if (content.file_path) {
+                // Fallback to constructing URL from file_path
+                videoUrl = 'http://localhost:8080/cloud/files/' + content.file_path;
+                log('Constructed URL from file_path: ' + videoUrl);
+            } else {
+                log('No URL or file path found for video content');
+                loadFallbackContent();
+                return;
+            }
+            
+            // Hide waiting screen
+            document.getElementById('noContentScreen').classList.add('hidden');
+            
+            // Check if we're using layout zones for videos
+            if (playlistState.layout && playlistState.layout.Zones && playlistState.currentItemIndex !== undefined) {
+                var currentItem = playlistState.items[playlistState.currentItemIndex];
+                if (currentItem && currentItem.LayoutPosition) {
+                    setupLayoutZones();
+                    loadMediaIntoZone(videoUrl, 'video', content.name, currentItem.LayoutPosition, duration);
+                    return;
+                }
+            }
+            
+            // No layout zones, use fullscreen
+            document.getElementById('layoutContainer').classList.add('hidden');
+            document.getElementById('contentFrame').classList.remove('hidden');
+            
+            var html = generateMediaHTML(videoUrl, 'video', content.name, duration);
+            loadHTMLContent(html);
+            
+            updateStatus('displaying_video');
+            updateContentType('Video', content.name);
+        }
+
+        // Generate HTML for media content
+        function generateMediaHTML(mediaUrl, mediaType, contentName, duration) {
+            var durationMs = duration || 10000; // Default 10 seconds
+            
+            var html = '<!DOCTYPE html>' +
+'<html>' +
+'<head>' +
+'    <meta charset="UTF-8">' +
+'    <meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+'    <title>Digital Signage - ' + contentName + '</title>' +
+'    <style>' +
+'        * { margin: 0; padding: 0; box-sizing: border-box; }' +
+'        body {' +
+'            background: #000;' +
+'            height: 100vh;' +
+'            display: flex;' +
+'            align-items: center;' +
+'            justify-content: center;' +
+'            overflow: hidden;' +
+'            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;' +
+'        }' +
+'        .media-container {' +
+'            width: 100%;' +
+'            height: 100%;' +
+'            display: flex;' +
+'            align-items: center;' +
+'            justify-content: center;' +
+'            position: relative;' +
+'        }' +
+'        img, video {' +
+'            max-width: 100%;' +
+'            max-height: 100%;' +
+'            object-fit: contain;' +
+'        }' +
+'        .content-info {' +
+'            position: absolute;' +
+'            bottom: 20px;' +
+'            left: 20px;' +
+'            color: rgba(255,255,255,0.7);' +
+'            font-size: 14px;' +
+'            background: rgba(0,0,0,0.5);' +
+'            padding: 8px 12px;' +
+'            border-radius: 4px;' +
+'        }' +
+'        .loading-error {' +
+'            color: #f28b82;' +
+'            text-align: center;' +
+'            padding: 40px;' +
+'        }' +
+'    </style>' +
+'</head>' +
+'<body>' +
+'    <div class="media-container">';
+            
+            if (mediaType === 'image') {
+                html += '<img id="mediaElement" src="' + mediaUrl + '" alt="' + contentName + '" onerror="showError()" />';
+            } else if (mediaType === 'video') {
+                html += '<video id="mediaElement" autoplay muted loop onerror="showError()"><source src="' + mediaUrl + '" type="video/mp4"></video>';
+            }
+            
+            html += '        <div class="content-info">📺 ' + contentName + ' (' + mediaType + ')</div>' +
+'    </div>' +
+'    <div id="errorMessage" class="loading-error" style="display: none;">' +
+'        <h3>Content Loading Error</h3>' +
+'        <p>Failed to load ' + mediaType + ' content</p>' +
+'        <p><strong>URL:</strong> ' + mediaUrl + '</p>' +
+'    </div>' +
+'    <script>' +
+'        function showError() {' +
+'            document.querySelector(".media-container").style.display = "none";' +
+'            document.getElementById("errorMessage").style.display = "block";' +
+'        }' +
+'        ' +
+'        // Auto-advance after duration' +
+'        setTimeout(function() {' +
+'            window.parent.postMessage({type: "contentComplete"}, "*");' +
+'        }, ' + durationMs + ');' +
+'        ' +
+'        // Log media loading' +
+'        window.addEventListener("load", function() {' +
+'            console.log("Media content loaded: ' + contentName + '");' +
+'        });' +
+'    </' + 'script>' +
+'</body>' +
+'</html>';
+            
+            return html;
+        }
+
+        // Load HTML content into iframe
+        function loadHTMLContent(html) {
+            var blob = new Blob([html], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            
+            var frame = document.getElementById('contentFrame');
+            frame.src = url;
+            frame.onload = function() {
+                URL.revokeObjectURL(url);
+                log('Media content HTML loaded successfully');
+            };
+            frame.onerror = function() {
+                URL.revokeObjectURL(url);
+                log('Media content HTML failed to load');
+                loadFallbackContent();
+            };
+        }
+
+        // Load media content (images, videos) - Legacy function
+        function loadMediaContent(mediaUrl, mediaType) {
+            log('Loading media content: ' + mediaType + ' from ' + mediaUrl);
+            
+            // Hide waiting screen and show content
+            document.getElementById('noContentScreen').classList.add('hidden');
+            document.getElementById('contentFrame').classList.remove('hidden');
+            
+            var html = '<!DOCTYPE html>' +
+'<html>' +
+'<head>' +
+'    <meta charset="UTF-8">' +
+'    <meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+'    <title>Digital Signage Media</title>' +
+'    <style>' +
+'        * { margin: 0; padding: 0; box-sizing: border-box; }' +
+'        body {' +
+'            background: #000;' +
+'            height: 100vh;' +
+'            display: flex;' +
+'            align-items: center;' +
+'            justify-content: center;' +
+'            overflow: hidden;' +
+'        }' +
+'        .media-container {' +
+'            width: 100%;' +
+'            height: 100%;' +
+'            display: flex;' +
+'            align-items: center;' +
+'            justify-content: center;' +
+'        }' +
+'        img, video {' +
+'            max-width: 100%;' +
+'            max-height: 100%;' +
+'            object-fit: contain;' +
+'        }' +
+'    </style>' +
+'</head>' +
+'<body>' +
+'    <div class="media-container">';
+            
+            if (mediaType === 'image') {
+                html += '<img src="' + mediaUrl + '" alt="Digital Signage Content" />';
+            } else if (mediaType === 'video') {
+                html += '<video autoplay muted loop><source src="' + mediaUrl + '" type="video/mp4"></video>';
+            }
+            
+            html += '    </div>' +
+'    <script>' +
+'        setTimeout(function() {' +
+'            window.parent.postMessage({type: "contentComplete"}, "*");' +
+'        }, 10000);' + // 10 seconds default for media
+'    </' + 'script>' +
+'</body>' +
+'</html>';
+            
+            var blob = new Blob([html], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            
+            var frame = document.getElementById('contentFrame');
+            frame.src = url;
+            frame.onload = function() {
+                URL.revokeObjectURL(url);
+                log('Media content loaded successfully');
+            };
+        }
+        
+        // Load content based on its type (template, image, video)
+        function loadContentByType(contentId, duration) {
+            log('Loading content by type for ID: ' + contentId);
+            
+            // First, fetch content info to determine type
+            fetch('http://localhost:8080/api/contents', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('backend_user:backend_password'),
+                    'X-Tenant-ID': deviceState.tenantId
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    log('Content API fetch failed: ' + response.status + ' ' + response.statusText);
+                    throw new Error('Failed to fetch content list');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.data) {
+                    // Find the content by ID
+                    var content = data.data.find(function(item) {
+                        return item.id === contentId;
+                    });
+                    
+                    if (content) {
+                        log('Found content: ' + content.name + ' (type: ' + content.content_type + ')');
+                        
+                        switch (content.content_type) {
+                            case 'template':
+                                loadTemplateContent(contentId, duration);
+                                break;
+                            case 'image':
+                                loadImageContent(content, duration);
+                                break;
+                            case 'video':
+                                loadVideoContent(content, duration);
+                                break;
+                            default:
+                                log('Unknown content type: ' + content.content_type);
+                                loadTemplateContent(contentId, duration); // Fallback to template
+                        }
+                    } else {
+                        log('Content not found: ' + contentId);
+                        loadFallbackContent();
+                    }
+                } else {
+                    log('No content data received');
+                    loadFallbackContent();
+                }
+            })
+            .catch(error => {
+                log('Error fetching content info: ' + error.message);
+                // Fallback to template loading for backward compatibility
+                loadTemplateContent(contentId, duration);
+            });
+        }
+
+        // Load template content via iframe (templates handle their own logic)
+        function loadTemplateContent(contentId, duration) {
+            log('Loading template content via iframe for content ID: ' + contentId);
+            
+            if (!contentId) {
+                log('No content ID provided for template loading');
+                loadFallbackContent();
+                return;
+            }
+            
+            // Load content via iframe from the proper cloud/contents URL
+            var contentUrl = 'http://localhost:8080/cloud/contents/' + contentId + '/preview';
+            log('Loading content iframe from: ' + contentUrl);
+            log('Content ID type: ' + typeof contentId + ', value: "' + contentId + '"');
+            
+            // Hide waiting screen
+            document.getElementById('noContentScreen').classList.add('hidden');
+            
+            // Check if we need to use layout zones
+            if (playlistState.layout && playlistState.layout.Zones && playlistState.currentItemIndex !== undefined) {
+                var currentItem = playlistState.items[playlistState.currentItemIndex];
+                if (currentItem && currentItem.LayoutPosition) {
+                    setupLayoutZones();
+                    loadContentIntoZone(contentId, currentItem.LayoutPosition, duration);
+                    return;
+                }
+            }
+            
+            // No layout, use full screen iframe
+            document.getElementById('layoutContainer').classList.add('hidden');
+            document.getElementById('contentFrame').classList.remove('hidden');
+            
+            var frame = document.getElementById('contentFrame');
+            frame.src = contentUrl;
+            
+            frame.onload = function() {
+                log('Content iframe loaded successfully');
+                updateStatus('displaying_content');
+                updateContentType('Template', contentId);
+                
+                // Set up timer for content duration if specified
+                if (duration) {
+                    setTimeout(function() {
+                        log('Content duration expired, moving to next item');
+                        window.dispatchEvent(new CustomEvent('contentComplete'));
+                    }, duration);
+                }
+            };
+            
+            frame.onerror = function() {
+                log('Content iframe failed to load');
+                loadFallbackContent();
+            };
+        }
+        
+        // Listen for messages from content frame and playlist events
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'contentComplete') {
+                if (Object.keys(playlistState.zonePlayers || {}).length > 0) {
+                    return;
+                }
+                log('Content display completed from template');
+                if (playlistState.isPlaying && playlistState.items.length > 1) {
+                    log('Moving to next playlist item...');
+                    moveToNextPlaylistItem();
+                } else {
+                    log('Single item or playlist ended, waiting for updates');
+                    updateStatus('waiting_for_websocket_sync');
+                }
+            }
+        });
+        
+        // Listen for custom content complete events
+        window.addEventListener('contentComplete', function(event) {
+            if (Object.keys(playlistState.zonePlayers || {}).length > 0) {
+                return;
+            }
+            log('Content duration expired, handling playlist cycling');
+            if (playlistState.isPlaying && playlistState.items.length > 1) {
+                moveToNextPlaylistItem();
+            }
+        });
+        
+        // Control functions
+        function toggleLogs() {
+            logsVisible = !logsVisible;
+            document.getElementById('logs').classList.toggle('hidden', !logsVisible);
+        }
+        
+        function refreshContent() {
+            log('Manual content refresh requested');
+            checkForContent();
+        }
+        
+        function resetDevice() {
+            log('Resetting device...');
+            
+            // Disconnect WebSocket
+            disconnectWebSocket();
+            
+            // Clear running playback timers
+            if (playlistState.cycleTimeout) {
+                clearTimeout(playlistState.cycleTimeout);
+            }
+            clearZonePlayers();
+
+            // Clear state
+            deviceState = {
+                id: null,
+                identifier: null,
+                registered: false,
+                token: null,
+                status: 'offline'
+            };
+            
+            // Clear playlist state
+            playlistState = {
+                currentPlaylist: null,
+                currentItemIndex: 0,
+                items: [],
+                isPlaying: false,
+                cycleTimeout: null,
+                layout: null,
+                zonePlayers: {}
+            };
+            
+            // Clear layout zones
+            var layoutContainer = document.getElementById('layoutContainer');
+            layoutContainer.innerHTML = '';
+            layoutContainer.classList.add('hidden');
+            
+            // Clear intervals and timeouts
+            if (contentCheckInterval) {
+                clearInterval(contentCheckInterval);
+                contentCheckInterval = null;
+            }
+            
+            playlistState.cycleTimeout = null;
+            
+            // Reset WebSocket state
+            wsReconnectAttempts = 0;
+            wsConnecting = false;
+            
+            // Reset UI
+            document.getElementById('deviceId').textContent = 'Not Registered';
+            document.getElementById('deviceStatus').textContent = 'Offline';
+            updateWSStatus('Disconnected');
+            updateContentType('None');
+            document.getElementById('deviceIdentifier').value = '';
+            document.getElementById('registrationMessage').textContent = '';
+            
+            // Show registration screen
+            document.getElementById('registrationScreen').classList.remove('hidden');
+            document.getElementById('noContentScreen').classList.add('hidden');
+            document.getElementById('contentFrame').classList.add('hidden');
+            
+            log('Device reset complete');
+            updateStatus('ready');
+        }
+        
+        // Setup layout zones based on layout configuration
+        function setupLayoutZones() {
+            var layoutContainer = document.getElementById('layoutContainer');
+            layoutContainer.innerHTML = ''; // Clear existing zones
+            
+            if (!playlistState.layout || !playlistState.layout.Zones) {
+                log('No layout zones to set up');
+                return;
+            }
+            
+            var zones = playlistState.layout.Zones;
+            log('Setting up ' + Object.keys(zones).length + ' layout zones');
+            
+            // Show layout container
+            layoutContainer.classList.remove('hidden');
+            document.getElementById('contentFrame').classList.add('hidden');
+            
+            // Create zone elements
+            for (var zoneName in zones) {
+                var zone = zones[zoneName];
+                var zoneElement = document.createElement('div');
+                zoneElement.className = 'layout-zone';
+                zoneElement.id = 'zone-' + zoneName;
+                
+                // Set position and size
+                zoneElement.style.left = zone.x + '%';
+                zoneElement.style.top = zone.y + '%';
+                zoneElement.style.width = zone.width + '%';
+                zoneElement.style.height = zone.height + '%';
+                
+                // Add label
+                var labelElement = document.createElement('div');
+                labelElement.className = 'zone-label';
+                labelElement.textContent = zoneName;
+                zoneElement.appendChild(labelElement);
+                
+                layoutContainer.appendChild(zoneElement);
+                log('Created zone: ' + zoneName + ' at ' + zone.x + ',' + zone.y + ' size ' + zone.width + 'x' + zone.height);
+            }
+        }
+        
+        // Load content into a specific zone
+        function loadContentIntoZone(contentId, zoneIndex, duration) {
+            var zones = playlistState.layout.Zones;
+            var zoneNames = Object.keys(zones);
+            
+            // Map zone index to zone name (zoneIndex is typically 1-based)
+            var zoneName = zoneNames[zoneIndex - 1] || zoneNames[0];
+            var zoneElement = document.getElementById('zone-' + zoneName);
+            
+            if (!zoneElement) {
+                log('Zone not found for index ' + zoneIndex + ', using first zone');
+                zoneElement = document.querySelector('.layout-zone');
+            }
+            
+            if (!zoneElement) {
+                log('No zones available, falling back to fullscreen');
+                document.getElementById('layoutContainer').classList.add('hidden');
+                document.getElementById('contentFrame').classList.remove('hidden');
+                loadTemplateContent(contentId, duration);
+                return;
+            }
+            
+            log('Loading content ' + contentId + ' into zone: ' + zoneName);
+            
+            // Create iframe for this zone
+            var iframe = document.createElement('iframe');
+            iframe.className = 'zone-content';
+            iframe.src = 'http://localhost:8080/cloud/contents/' + contentId + '/preview';
+            
+            // Clear zone content and add new iframe
+            var existingContent = zoneElement.querySelector('.zone-content');
+            if (existingContent) {
+                existingContent.remove();
+            }
+            zoneElement.appendChild(iframe);
+            
+            iframe.onload = function() {
+                log('Zone content loaded successfully in ' + zoneName);
+                updateStatus('displaying_content');
+                updateContentType('Template', contentId + ' (Zone: ' + zoneName + ')');
+                
+                // Set up timer for content duration if specified
+                if (duration) {
+                    setTimeout(function() {
+                        log('Zone content duration expired, moving to next item');
+                        window.dispatchEvent(new CustomEvent('contentComplete'));
+                    }, duration);
+                }
+            };
+            
+            iframe.onerror = function() {
+                log('Zone content failed to load in ' + zoneName);
+                loadFallbackContent();
+            };
+        }
+        
+        // Load media (image/video) into a specific zone
+        function loadMediaIntoZone(mediaUrl, mediaType, contentName, zoneIndex, duration) {
+            var zones = playlistState.layout.Zones;
+            var zoneNames = Object.keys(zones);
+            
+            // Map zone index to zone name (zoneIndex is typically 1-based)
+            var zoneName = zoneNames[zoneIndex - 1] || zoneNames[0];
+            var zoneElement = document.getElementById('zone-' + zoneName);
+            
+            if (!zoneElement) {
+                log('Zone not found for index ' + zoneIndex + ', using first zone');
+                zoneElement = document.querySelector('.layout-zone');
+            }
+            
+            if (!zoneElement) {
+                log('No zones available, falling back to fullscreen');
+                document.getElementById('layoutContainer').classList.add('hidden');
+                document.getElementById('contentFrame').classList.remove('hidden');
+                var html = generateMediaHTML(mediaUrl, mediaType, contentName, duration);
+                loadHTMLContent(html);
+                return;
+            }
+            
+            log('Loading ' + mediaType + ' content into zone: ' + zoneName);
+            
+            // Create iframe with media HTML for this zone
+            var iframe = document.createElement('iframe');
+            iframe.className = 'zone-content';
+            
+            // Generate and load the media HTML
+            var html = generateMediaHTML(mediaUrl, mediaType, contentName, duration);
+            var blob = new Blob([html], { type: 'text/html' });
+            var url = URL.createObjectURL(blob);
+            
+            // Clear zone content and add new iframe
+            var existingContent = zoneElement.querySelector('.zone-content');
+            if (existingContent) {
+                existingContent.remove();
+            }
+            zoneElement.appendChild(iframe);
+            
+            iframe.src = url;
+            iframe.onload = function() {
+                URL.revokeObjectURL(url);
+                log('Zone media content loaded successfully in ' + zoneName);
+                updateStatus('displaying_' + mediaType);
+                updateContentType(mediaType.charAt(0).toUpperCase() + mediaType.slice(1), contentName + ' (Zone: ' + zoneName + ')');
+            };
+            
+            iframe.onerror = function() {
+                URL.revokeObjectURL(url);
+                log('Zone media content failed to load in ' + zoneName);
+                loadFallbackContent();
+            };
+        }
+        
+        // Initialize
+        window.addEventListener('load', function() {
+            log('Device simulator started');
+            document.getElementById('deviceIdentifier').value = generateDeviceId();
+            updateStatus('ready');
+        });
+    </script>
+</body>
+</html>

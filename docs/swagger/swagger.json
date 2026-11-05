@@ -1,0 +1,37 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Digital Signage API",
+    "description": "Backend API for digital signage device registration, content sync, and management.",
+    "version": "1.0"
+  },
+  "basePath": "/",
+  "paths": {
+    "/api/websocket-test/{deviceId}/content-sync": {
+      "post": {
+        "security": [{"BasicAuth": []}],
+        "tags": ["websocket-test"],
+        "summary": "Send manual content-sync message"
+      }
+    },
+    "/api/websocket-test/{deviceId}/device-assigned": {
+      "post": {
+        "security": [{"BasicAuth": []}],
+        "tags": ["websocket-test"],
+        "summary": "Send manual device-assigned message"
+      }
+    },
+    "/api/websocket-test/{deviceId}/custom": {
+      "post": {
+        "security": [{"BasicAuth": []}],
+        "tags": ["websocket-test"],
+        "summary": "Send custom websocket test message"
+      }
+    }
+  },
+  "securityDefinitions": {
+    "BasicAuth": {
+      "type": "basic"
+    }
+  }
+}
